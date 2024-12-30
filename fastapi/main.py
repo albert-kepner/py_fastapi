@@ -52,4 +52,15 @@ async def update_shape(shape_id: int, shape: Shape):
         return shape
     raise HTTPException(status_code=404, detail=f'No shape with id {shape_id} found')
     
+@app.put("/shapes/upsert/{shape_id}")
+async def update_shape(shape_id: int, shape: Shape):
+    if shapes.count_documents({"id": shape_id}) > 0:
+        shapes.replace_one({"id": shape_id}, shape.model_dump(), upsert=True)
+        return shape
     
+@app.delete("/shapes/{shape_id}")
+async def delete_shape(shape_id: int):
+    delete_result = shapes.delete_one({"id": shape_id})
+    if delete_result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail=f'No shape with id {shape_id} found')
+    return {"OK": True}
