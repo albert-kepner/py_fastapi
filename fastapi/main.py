@@ -1,12 +1,25 @@
 from fastapi import FastAPI, HTTPException
+from mongita import MongitaClientDisk
+from pydantic import BaseModel
+
+class Shape(BaseModel):
+    name: str
+    sides: int
+    id: int
 
 app = FastAPI()
 
-shapes = [
-    {"item_name": "Circle", "no_of_sides": 1, "id": 1},
-    {"item_name": "Triangle", "no_of_sides": 3, "id": 2},
-    {"item_name": "Octogon", "no_of_sides": 8, "id": 3},
-]
+client = MongitaClientDisk()
+db = client.db
+shapes = db.shapes
+print(f'{shapes=}')
+# shapes.insert_one({"id": 1, "name": "circle", "sides": 0})
+# shapes.insert_one({"id": 2, "name": "triangle", "sides": 3})
+# shapes.insert_one({"id": 3, "name": "square", "sides": 4})
+# shapes.insert_one({"id": 4, "name": "pentagon", "sides": 5})
+# shapes.insert_one({"id": 5, "name": "hexagon", "sides": 6})
+# shapes.insert_one({"id": 6, "name": "heptagon", "sides": 7})
+# shapes.insert_one({"id": 7, "name": "octagon", "sides": 8}) 
 
 @app.get("/")
 async def root():
@@ -14,11 +27,29 @@ async def root():
 
 @app.get("/shapes")
 async def get_shapes():
-    return shapes
+    existing_shapes = shapes.find({})
+    return [
+       {key:shape[key] for key in shape if key != "_id"}
+       for shape in existing_shapes 
+    ]
 
 @app.get("/shapes/{shape_id}")
 async def get_shape_by_id(shape_id: int):
-    for shape in shapes:
-        if shape["id"] == shape_id:
-            return shape
+    if shapes.count_documents({"id": shape_id}) > 0:
+        shape = shapes.find_one({"id": shape_id})
+        return {key:shape[key] for key in shape if key != "_id"} 
     raise HTTPException(status_code=404, detail=f'No shape with id {shape_id} found')
+
+@app.post("/shapes")
+async def post_shape(shape: Shape):
+    shapes.insert_one(shape.model_dump())
+    return shape
+
+@app.put("/shapes/{shape_id}")
+async def update_shape(shape_id: int, shape: Shape):
+    if shapes.count_documents({"id": shape_id}) > 0:
+        shapes.replace_one({"id": shape_id}, shape.model_dump())
+        return shape
+    raise HTTPException(status_code=404, detail=f'No shape with id {shape_id} found')
+    
+    
